@@ -214,8 +214,14 @@ export async function video_basic_info(url: string, options: InfoOptions = {}): 
         }
     );
     const microformat = player_response.microformat.playerMicroformatRenderer;
-    const musicInfo = initial_response.engagementPanels.find((item: any) => item?.engagementPanelSectionListRenderer?.panelIdentifier == 'engagement-panel-structured-description')?.engagementPanelSectionListRenderer.content.structuredDescriptionContentRenderer.items
-        .find((el: any) => el.videoDescriptionMusicSectionRenderer)?.videoDescriptionMusicSectionRenderer.carouselLockups;
+    const musicInfo = initial_response.engagementPanels
+        .find(
+            (item: any) =>
+                item?.engagementPanelSectionListRenderer?.panelIdentifier == 'engagement-panel-structured-description'
+        )
+        ?.engagementPanelSectionListRenderer.content.structuredDescriptionContentRenderer.items.find(
+            (el: any) => el.videoDescriptionMusicSectionRenderer
+        )?.videoDescriptionMusicSectionRenderer.carouselLockups;
 
     const music: any[] = [];
     if (musicInfo) {
@@ -223,13 +229,27 @@ export async function video_basic_info(url: string, options: InfoOptions = {}): 
             if (!x.carouselLockupRenderer) return;
             const row = x.carouselLockupRenderer;
 
-            const song = row.videoLockup?.compactVideoRenderer.title.simpleText ?? row.videoLockup?.compactVideoRenderer.title.runs?.find((x:any) => x.text)?.text;
-            const metadata = row.infoRows?.map((info: any) => [info.infoRowRenderer.title.simpleText.toLowerCase(), ((info.infoRowRenderer.expandedMetadata ?? info.infoRowRenderer.defaultMetadata)?.runs?.map((i:any) => i.text).join("")) ?? info.infoRowRenderer.defaultMetadata?.simpleText ?? info.infoRowRenderer.expandedMetadata?.simpleText ?? ""]);
+            const song =
+                row.videoLockup?.compactVideoRenderer.title.simpleText ??
+                row.videoLockup?.compactVideoRenderer.title.runs?.find((x: any) => x.text)?.text;
+            const metadata = row.infoRows?.map((info: any) => [
+                info.infoRowRenderer.title.simpleText.toLowerCase(),
+                (info.infoRowRenderer.expandedMetadata ?? info.infoRowRenderer.defaultMetadata)?.runs
+                    ?.map((i: any) => i.text)
+                    .join('') ??
+                    info.infoRowRenderer.defaultMetadata?.simpleText ??
+                    info.infoRowRenderer.expandedMetadata?.simpleText ??
+                    ''
+            ]);
             const contents = Object.fromEntries(metadata ?? {});
-            const id = row.videoLockup?.compactVideoRenderer.navigationEndpoint?.watchEndpoint.videoId
-                ?? row.infoRows?.find((x: any) => x.infoRowRenderer.title.simpleText.toLowerCase() == "song")?.infoRowRenderer.defaultMetadata.runs?.find((x: any) => x.navigationEndpoint)?.navigationEndpoint.watchEndpoint?.videoId;
+            const id =
+                row.videoLockup?.compactVideoRenderer.navigationEndpoint?.watchEndpoint.videoId ??
+                row.infoRows
+                    ?.find((x: any) => x.infoRowRenderer.title.simpleText.toLowerCase() == 'song')
+                    ?.infoRowRenderer.defaultMetadata.runs?.find((x: any) => x.navigationEndpoint)?.navigationEndpoint
+                    .watchEndpoint?.videoId;
 
-            music.push({song, url: id ? `https://www.youtube.com/watch?v=${id}` : null, ...contents})
+            music.push({ song, url: id ? `https://www.youtube.com/watch?v=${id}` : null, ...contents });
         });
     }
     const rawChapters =
@@ -262,8 +282,11 @@ export async function video_basic_info(url: string, options: InfoOptions = {}): 
     const likeRenderer = initial_response.contents.twoColumnWatchNextResults.results.results.contents
         .find((content: any) => content.videoPrimaryInfoRenderer)
         ?.videoPrimaryInfoRenderer.videoActions.menuRenderer.topLevelButtons?.find(
-            (button: any) => button.toggleButtonRenderer?.defaultIcon.iconType === 'LIKE' || button.segmentedLikeDislikeButtonRenderer?.likeButton.toggleButtonRenderer?.defaultIcon.iconType === 'LIKE'
-        )
+            (button: any) =>
+                button.toggleButtonRenderer?.defaultIcon.iconType === 'LIKE' ||
+                button.segmentedLikeDislikeButtonRenderer?.likeButton.toggleButtonRenderer?.defaultIcon.iconType ===
+                    'LIKE'
+        );
 
     const video_details = new YouTubeVideo({
         id: vid.videoId,
@@ -286,8 +309,15 @@ export async function video_basic_info(url: string, options: InfoOptions = {}): 
         views: vid.viewCount,
         tags: vid.keywords,
         likes: parseInt(
-            likeRenderer?.toggleButtonRenderer?.defaultText.accessibility?.accessibilityData.label.replace(/\D+/g, '') ?? 
-            likeRenderer?.segmentedLikeDislikeButtonRenderer?.likeButton.toggleButtonRenderer?.defaultText.accessibility?.accessibilityData.label.replace(/\D+/g, '') ?? 0
+            likeRenderer?.toggleButtonRenderer?.defaultText.accessibility?.accessibilityData.label.replace(
+                /\D+/g,
+                ''
+            ) ??
+                likeRenderer?.segmentedLikeDislikeButtonRenderer?.likeButton.toggleButtonRenderer?.defaultText.accessibility?.accessibilityData.label.replace(
+                    /\D+/g,
+                    ''
+                ) ??
+                0
         ),
         live: vid.isLiveContent,
         private: vid.isPrivate,
@@ -297,15 +327,17 @@ export async function video_basic_info(url: string, options: InfoOptions = {}): 
     });
     let format = [];
     if (!upcoming) {
-        format.push(...(player_response.streamingData.formats ?? []));
-        format.push(...(player_response.streamingData.adaptiveFormats ?? []));
+        // format.push(...(player_response.streamingData.formats ?? []));
+        // format.push(...(player_response.streamingData.adaptiveFormats ?? []));
 
         // get the formats for the android player for legacy videos
         // fixes the stream being closed because not enough data
         // arrived in time for ffmpeg to be able to extract audio data
-        if (parseAudioFormats(format).length === 0 && !options.htmldata) {
-            format = await getAndroidFormats(vid.videoId, cookieJar, body);
-        }
+        // if (parseAudioFormats(format).length === 0 && !options.htmldata) {
+        //     format = await getAndroidFormats(vid.videoId, cookieJar, body);
+        // }
+
+        format = await getIosFormat(vid.videoId, cookieJar, body);
     }
     const LiveStreamData = {
         isLive: video_details.live,
@@ -404,15 +436,16 @@ export async function video_stream_info(url: string, options: InfoOptions = {}):
     };
     let format = [];
     if (!upcoming) {
-        format.push(...(player_response.streamingData.formats ?? []));
-        format.push(...(player_response.streamingData.adaptiveFormats ?? []));
+        // format.push(...(player_response.streamingData.formats ?? []));
+        // format.push(...(player_response.streamingData.adaptiveFormats ?? []));
 
         // get the formats for the android player for legacy videos
         // fixes the stream being closed because not enough data
         // arrived in time for ffmpeg to be able to extract audio data
-        if (parseAudioFormats(format).length === 0 && !options.htmldata) {
-            format = await getAndroidFormats(player_response.videoDetails.videoId, cookieJar, body);
-        }
+        // if (parseAudioFormats(format).length === 0 && !options.htmldata) {
+        //     format = await getAndroidFormats(player_response.videoDetails.videoId, cookieJar, body);
+        // }
+        format = await getIosFormat(player_response.videoDetails.videoId, cookieJar, body);
     }
 
     const LiveStreamData = {
@@ -612,33 +645,36 @@ async function acceptViewerDiscretion(
     if (!sessionToken)
         throw new Error(`Unable to extract XSRF_TOKEN to accept the viewer discretion popup for video: ${videoId}.`);
 
-    const verificationResponse = await request(`https://www.youtube.com/youtubei/v1/verify_age?key=${apiKey}&prettyPrint=false`, {
-        method: 'POST',
-        body: JSON.stringify({
-            context: {
-                client: {
-                    utcOffsetMinutes: 0,
-                    gl: 'US',
-                    hl: 'en',
-                    clientName: 'WEB',
-                    clientVersion:
-                        body.split('"INNERTUBE_CONTEXT_CLIENT_VERSION":"')[1]?.split('"')[0] ??
-                        body.split('"innertube_context_client_version":"')[1]?.split('"')[0] ??
-                        '<some version>'
+    const verificationResponse = await request(
+        `https://www.youtube.com/youtubei/v1/verify_age?key=${apiKey}&prettyPrint=false`,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                context: {
+                    client: {
+                        utcOffsetMinutes: 0,
+                        gl: 'US',
+                        hl: 'en',
+                        clientName: 'WEB',
+                        clientVersion:
+                            body.split('"INNERTUBE_CONTEXT_CLIENT_VERSION":"')[1]?.split('"')[0] ??
+                            body.split('"innertube_context_client_version":"')[1]?.split('"')[0] ??
+                            '<some version>'
+                    },
+                    user: {},
+                    request: {}
                 },
-                user: {},
-                request: {}
-            },
-            nextEndpoint: {
-                urlEndpoint: {
-                    url: `/watch?v=${videoId}&has_verified=1`
-                }
-            },
-            setControvercy: true
-        }),
-        cookies: true,
-        cookieJar
-    });
+                nextEndpoint: {
+                    urlEndpoint: {
+                        url: `/watch?v=${videoId}&has_verified=1`
+                    }
+                },
+                setControvercy: true
+            }),
+            cookies: true,
+            cookieJar
+        }
+    );
 
     const endpoint = JSON.parse(verificationResponse).actions[0].navigateAction.endpoint;
 
@@ -680,6 +716,39 @@ async function acceptViewerDiscretion(
     return { streamingData };
 }
 
+async function getIosFormat(videoId: string, cookieJar: { [key: string]: string }, body: string): Promise<any[]> {
+    const apiKey =
+        body.split('INNERTUBE_API_KEY":"')[1]?.split('"')[0] ??
+        body.split('innertubeApiKey":"')[1]?.split('"')[0] ??
+        DEFAULT_API_KEY;
+
+    const response = await request(`https://www.youtube.com/youtubei/v1/player?key=${apiKey}&prettyPrint=false`, {
+        method: 'POST',
+        body: JSON.stringify({
+            context: {
+                client: {
+                    clientName: 'IOS',
+                    clientVersion: '19.09.3',
+                    deviceModel: 'iPhone16,1',
+                    userAgent: 'com.google.ios.youtube/19.09.3 (iPhone; CPU iPhone OS 17_5 like Mac OS X)',
+                    hl: 'en',
+                    timeZone: 'UTC',
+                    utcOffsetMinutes: 0
+                }
+            },
+            videoId: videoId,
+            playbackContext: { contentPlaybackContext: { html5Preference: 'HTML5_PREF_WANTS' } },
+            contentCheckOk: true,
+            racyCheckOk: true
+        }),
+        cookies: true,
+        cookieJar
+    });
+
+    // return JSON.parse(response).streamingData.formats;
+    return JSON.parse(response).streamingData.adaptiveFormats;
+}
+
 async function getAndroidFormats(videoId: string, cookieJar: { [key: string]: string }, body: string): Promise<any[]> {
     const apiKey =
         body.split('INNERTUBE_API_KEY":"')[1]?.split('"')[0] ??
@@ -712,8 +781,7 @@ async function getAndroidFormats(videoId: string, cookieJar: { [key: string]: st
 
 function getWatchPlaylist(response: any, body: any, url: string): YouTubePlayList {
     const playlist_details = response.contents.twoColumnWatchNextResults.playlist?.playlist;
-    if (!playlist_details)
-        throw new Error("Watch playlist unavailable due to YouTube layout changes.")
+    if (!playlist_details) throw new Error('Watch playlist unavailable due to YouTube layout changes.');
 
     const videos = getWatchPlaylistVideos(playlist_details.contents);
     const API_KEY =
