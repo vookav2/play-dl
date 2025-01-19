@@ -746,7 +746,11 @@ async function getIosFormat(videoId: string, cookieJar: { [key: string]: string 
     });
 
     // return JSON.parse(response).streamingData.formats;
-    return JSON.parse(response).streamingData.adaptiveFormats;
+    const resJson = JSON.parse(response);
+    if (!resJson?.streamingData?.adaptiveFormats) {
+        return [];
+    }
+    return resJson.streamingData.adaptiveFormats;
 }
 
 async function getAndroidFormats(videoId: string, cookieJar: { [key: string]: string }, body: string): Promise<any[]> {
